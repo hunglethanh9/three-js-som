@@ -2,49 +2,66 @@ const THREE = require('three')
 const OrbitControls = require('three-orbit-controls')(THREE)
 const dat = require('dat.gui');
 
-var params = {
-    rotationX: .01,
-    rotationY: .01
+params = {
+    neuronsInitialSpread: 2,
+    neuronsAmount: 100,
 }
 
-const TAU = 2 * Math.PI;
-
-start();
+initThree();
+initNeurons();
+initTarget = () => initSphere();
+initTarget();
 render();
 
-function start() {
+function initThree() {
     scene = new THREE.Scene();
+    var backgroundColor = new THREE.Color(0x888888);
+    scene.fog = new THREE.FogExp2(backgroundColor, 0.05);
+    scene.background = backgroundColor;
 
     aspect = window.innerWidth / window.innerHeight;
-    fov = 60;
+    var fov = 60;
     camera = new THREE.PerspectiveCamera(fov, aspect);
-    camera.position.set(1, 1, 1);
+    var distance = 7;
+    camera.position.set(distance, distance, distance);
     camera.lookAt(new THREE.Vector3());
 
-    renderer = new THREE.WebGLRenderer();
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
     controls = new OrbitControls(camera, renderer.domElement);
 
-    var geometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
-    var material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
-    box = new THREE.LineSegments(geometry, material);
-    scene.add(box);
-
-    var axesHelper = new THREE.AxesHelper();
-    scene.add(axesHelper);
-
     gui = new dat.GUI();
-    gui.add(params, 'rotationX', .0, .1);
-    gui.add(params, 'rotationY', .0, .1);
+    gui.add(params, 'neuronsInitialSpread', 0, 10);
+    gui.add(params, 'neuronsAmount', 10, 1000).step(100);
 }
 
 function render() {
     requestAnimationFrame(render);
-    box.rotation.x += params.rotationX;
-    box.rotation.y += params.rotationY;
     renderer.render(scene, camera);
+}
+
+function initNeurons() {
+    var neuronCoords = [];
+    for (var i = 0; i < params.neuronsAmount; i++) {
+        neuronCoords.push(
+            params.neuronsInitialSpread * (.5 - Math.random()),
+            params.neuronsInitialSpread * (.5 - Math.random()),
+            params.neuronsInitialSpread * (.5 - Math.random())
+        );
+    }
+    var geometry = new THREE.BufferGeometry();
+    var vertices = new Float32Array(neuronCoords);
+    geometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
+
+    var neuronsMaterial = new THREE.PointsMaterial({ size: .2 });
+    var neurons = new THREE.Points(geometry, neuronsMaterial);
+    scene.add(neurons);
+
+    var neuronLinesMaterial = new THREE.LineDashedMaterial()
+    var neuronLines = new THREE.Line(geometry, neuronLinesMaterial);
+    scene.add(neuronLines);
 }
 
 window.addEventListener('resize', onWindowResize);
@@ -53,4 +70,13 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function initSphere() {
+    var radius = 5;
+    var geometry = new THREE.IcosahedronBufferGeometry(radius, 2);
+    var wireframe = new THREE.WireframeGeometry(geometry);
+    var material = new THREE.LineBasicMaterial({ color: 0x000000 });
+    var lines = new THREE.LineSegments(wireframe, material);
+    scene.add(lines);
 }
