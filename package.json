@@ -1,0 +1,25 @@
+{
+  "name": "self-organizing-map-3d",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "three": "^0.95.0",
+    "three-orbit-controls": "^82.1.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/j4nw/self-organizing-map-3d.git"
+  },
+  "keywords": [],
+  "author": "Jan Wojtecki",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/j4nw/self-organizing-map-3d/issues"
+  },
+  "homepage": "https://github.com/j4nw/self-organizing-map-3d#readme"
+}
