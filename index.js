@@ -32,9 +32,11 @@ function initThree() {
 
     controls = new OrbitControls(camera, renderer.domElement);
 
+    /*
     gui = new dat.GUI();
     gui.add(params, 'neuronsInitialSpread', 0, 10);
     gui.add(params, 'neuronsAmount', 10, 1000).step(100);
+    */
 }
 
 function render() {
