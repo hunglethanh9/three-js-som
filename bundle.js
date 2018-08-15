@@ -4,7 +4,7 @@ const OrbitControls = require('three-orbit-controls')(THREE)
 const dat = require('dat.gui');
 
 params = {
-    neuronsInitialSpread: 2,
+    neuronsInitialSpread: 3,
     neuronsAmount: 100,
 }
 
@@ -17,7 +17,7 @@ render();
 function initThree() {
     scene = new THREE.Scene();
     var backgroundColor = new THREE.Color(0x888888);
-    scene.fog = new THREE.FogExp2(backgroundColor, 0.05);
+    scene.fog = new THREE.FogExp2(backgroundColor, 0.06);
     scene.background = backgroundColor;
 
     aspect = window.innerWidth / window.innerHeight;
