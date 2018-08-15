@@ -11,7 +11,7 @@ initThree();
 initNeurons();
 initTarget = (size) => initSphere(size / 2.0);
 initTarget(10);
-render();
+animate();
 
 function initThree() {
     scene = new THREE.Scene();
@@ -39,27 +39,40 @@ function initThree() {
     */
 }
 
-function render() {
-    requestAnimationFrame(render);
+function animate() {
+    requestAnimationFrame(animate);
+
+    for (var i = 0; i < params.neuronsAmount; i++)
+    {
+        var point = sampleSphere(params.neuronsInitialRadius);
+        neuronPositions[3 * i + 0] = point.x;
+        neuronPositions[3 * i + 1] = point.y;
+        neuronPositions[3 * i + 2] = point.z;
+    }
+    neuronsBufferGeometry.attributes.position.needsUpdate = true;
+
     renderer.render(scene, camera);
 }
 
 function initNeurons() {
-    var neuronCoords = [];
+    var points = [];
     for (var i = 0; i < params.neuronsAmount; i++) {
         var point = sampleSphere(params.neuronsInitialRadius);
-        neuronCoords.push(point.x, point.y, point.z);
+        points.push(point.x, point.y, point.z);
     }
-    var geometry = new THREE.BufferGeometry();
-    var vertices = new Float32Array(neuronCoords);
-    geometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
+
+    neuronsBufferGeometry = new THREE.BufferGeometry();
+    neuronsBufferGeometry.dynamic = true;
+    var vertices = new Float32Array(points);
+    neuronsBufferGeometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    neuronPositions = neuronsBufferGeometry.attributes.position.array;
 
     var neuronsMaterial = new THREE.PointsMaterial({ size: .2 });
-    var neurons = new THREE.Points(geometry, neuronsMaterial);
-    scene.add(neurons);
+    var neuronPoints = new THREE.Points(neuronsBufferGeometry, neuronsMaterial);
+    scene.add(neuronPoints);
 
     var neuronLinesMaterial = new THREE.LineDashedMaterial()
-    var neuronLines = new THREE.Line(geometry, neuronLinesMaterial);
+    var neuronLines = new THREE.Line(neuronsBufferGeometry, neuronLinesMaterial);
     scene.add(neuronLines);
 }
 
