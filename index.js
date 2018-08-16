@@ -4,8 +4,10 @@ const dat = require('dat.gui');
 
 params = {
     neuronsInitialRadius: 5,
-    neuronsAmount: 100,
+    neuronsAmountSide: 100,
 }
+
+var neuronsCount, iteration = 0;
 
 initThree();
 initNeurons();
@@ -42,21 +44,20 @@ function initThree() {
 function animate() {
     requestAnimationFrame(animate);
 
-    for (var i = 0; i < params.neuronsAmount; i++)
-    {
-        var point = sampleSphere(params.neuronsInitialRadius);
-        neuronPositions[3 * i + 0] = point.x;
-        neuronPositions[3 * i + 1] = point.y;
-        neuronPositions[3 * i + 2] = point.z;
-    }
+    var pickedTarget = sampleSphere(5);
+    iterate(pickedTarget, iteration);
+    iteration++;
+
     neuronsBufferGeometry.attributes.position.needsUpdate = true;
 
     renderer.render(scene, camera);
 }
 
 function initNeurons() {
+    neuronsCount = params.neuronsAmountSide;
+
     var points = [];
-    for (var i = 0; i < params.neuronsAmount; i++) {
+    for (var i = 0; i < neuronsCount; i++) {
         var point = sampleSphere(params.neuronsInitialRadius);
         points.push(point.x, point.y, point.z);
     }
@@ -103,4 +104,71 @@ function sampleSphere(radius) {
     var y = adjustedRandomRadius * Math.sin(theta) * sinPhi
     var z = adjustedRandomRadius * Math.cos(phi);
     return new THREE.Vector3(x, y, z);
+}
+
+function findClosestNeuron(point) {
+    var minIndex, minDistance = Infinity, minPosition;
+    for (var i = 0; i < neuronsCount; i++) {
+        var position = getNeuronPosition(i);
+        var distance = position.distanceTo(point);
+        if (distance < minDistance) {
+            minDistance = distance;
+            minIndex = i;
+            minPosition = position;
+        }
+    }
+    return [minIndex, minPosition];
+}
+
+/*
+function getNeighborIndices1D(center, radius) {
+    var integerRadius = Math.floor(radius);
+    var start = Math.max(center - integerRadius, 0);
+    var end = Math.min(center + integerRadius, neuronsCount);
+    return _.range(start, end);
+}
+
+var getNeighborIndices = (center, radius) => getNeighborIndices(center, radius);
+*/
+
+function neighborhoodDistance1D(a, b) {
+    return Math.abs(a - b);
+}
+
+neighborhoodDistance = (a, b) => neighborhoodDistance1D(a, b);
+
+function gaussian(x, sigma) {
+    return Math.exp(-(x * x) / (sigma * sigma));
+}
+
+function iterate(targetPosition, iteration) {
+    var decayingCoefficient = Math.exp(-iteration / 50);
+    var range = neuronsCount * decayingCoefficient;
+    var force = decayingCoefficient;
+
+    var bestIndex, bestPosition;
+    [bestIndex, bestPosition] = findClosestNeuron(targetPosition);
+
+    for (var i = 0; i < neuronsCount; i++)
+    {
+        var position = getNeuronPosition(i);
+        var indexDistance = neighborhoodDistance1D(i, bestIndex);
+        var g = gaussian(indexDistance, range);
+        position = position.addScaledVector(targetPosition.sub(position), force * g);
+        setNeuronPosition(i, position);
+    }
+}
+
+function getNeuronPosition(index) {
+    return new THREE.Vector3(
+        neuronPositions[3 * index + 0],
+        neuronPositions[3 * index + 1],
+        neuronPositions[3 * index + 2]
+    );
+}
+
+function setNeuronPosition(index, position) {
+    neuronPositions[3 * index + 0] = position.x;
+    neuronPositions[3 * index + 1] = position.y;
+    neuronPositions[3 * index + 2] = position.z;
 }
