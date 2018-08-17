@@ -2,22 +2,25 @@ const THREE = require('three')
 const OrbitControls = require('three-orbit-controls')(THREE)
 const dat = require('dat.gui');
 
-params = {
-    neuronsInitialRadius: 1,
-    neuronsAmountSide: 1000,
+guiParams = {
+    networkParams: {
+        neuronsSpread: 1,
+        neuronsCount: 1000,
+        initialRange: 0.5,
+        initialForce: 0.5,
+        rangeDecay: 0.001,
+        forceDecay: 0.0006,
+    },
     isPlaying: true,
-    initialRange: 0.5,
-    initialForce: 0.5,
-    rangeDecay: 0.001,
-    forceDecay: 0.0006,
+    restart: () => restartScene(),
+    iterate: () => iterate(),
 }
 
 let neuronsCount, iteration = 0;
 
 initThree();
-initNeurons();
 initTarget = (size) => initSphere(size / 2.0);
-initTarget(10);
+initScene();
 animate();
 
 function initThree() {
@@ -38,28 +41,68 @@ function initThree() {
     document.body.appendChild(renderer.domElement);
 
     controls = new OrbitControls(camera, renderer.domElement);
+    controls.enablePan = false;
+
+    let gui = new dat.GUI({ width: 300 });
+
+    let paramsFolder = gui.addFolder('Network parameters');
+    paramsFolder
+        .add(guiParams.networkParams, 'neuronsCount', 10, 10000)
+        .name('neuron count <a style="color: #fff" href="" title="For a multidimensional network, this will be clamped down to fit a regular grid">?</a>');
+    paramsFolder
+        .add(guiParams.networkParams, 'initialRange', 0, 1)
+        .name('<b>h</b> initial range');
+    paramsFolder
+        .add(guiParams.networkParams, 'rangeDecay', 0, .005)
+        .name('<b>&lambda;<sub>h</sub></b> range decay');
+    paramsFolder
+        .add(guiParams.networkParams, 'initialForce', 0, 1)
+        .name('<b>&sigma;</b> initial force');
+    paramsFolder
+        .add(guiParams.networkParams, 'forceDecay', 0, .005)
+        .name('<b>&lambda;<sub>&sigma;</sub></b> force decay');;
+
+    gui.add(guiParams, 'isPlaying').name('Autoplay');
+    gui.add(guiParams, 'iterate').name('Iterate once');
+    gui.add(guiParams, 'restart').name('<b>RESTART</b>');
+}
+
+function initScene() {
+    params = Object.assign({}, guiParams.networkParams);
+    console.table(params);
+    initNeurons();
+    initTarget(10);
+}
+
+function clearScene() {
+    scene.remove(neuronPoints);
+    scene.remove(neuronLines);
+    neuronsBufferGeometry.dispose();
+    scene.remove(dataRepresentation);
+}
+
+function restartScene() {
+    clearScene();
+    initScene();
+    iteration = 0;
 }
 
 function animate() {
     requestAnimationFrame(animate);
 
-    if (params.isPlaying) {
-        let pickedTarget = randomFromSphere(5);
-
-        iterate(pickedTarget, iteration);
-        iteration++;
-        neuronsBufferGeometry.attributes.position.needsUpdate = true;
+    if (guiParams.isPlaying) {
+        iterate();
     }
 
     renderer.render(scene, camera);
 }
 
 function initNeurons() {
-    neuronsCount = params.neuronsAmountSide;
+    neuronsCount = params.neuronsCount;
 
     let points = [];
     for (let i = 0; i < neuronsCount; i++) {
-        let point = randomFromSphere(params.neuronsInitialRadius);
+        let point = sampleFromSphereVolume(params.neuronsSpread);
         points.push(point.x, point.y, point.z);
     }
 
@@ -71,11 +114,11 @@ function initNeurons() {
     neuronPositions = neuronsBufferGeometry.attributes.position.array;
 
     let neuronsMaterial = new THREE.PointsMaterial({ size: .1 });
-    let neuronPoints = new THREE.Points(neuronsBufferGeometry, neuronsMaterial);
+    neuronPoints = new THREE.Points(neuronsBufferGeometry, neuronsMaterial);
     scene.add(neuronPoints);
 
     let neuronLinesMaterial = new THREE.LineBasicMaterial()
-    let neuronLines = new THREE.Line(neuronsBufferGeometry, neuronLinesMaterial);
+    neuronLines = new THREE.Line(neuronsBufferGeometry, neuronLinesMaterial);
     scene.add(neuronLines);
 }
 
@@ -90,11 +133,12 @@ function initSphere(radius) {
     let geometry = new THREE.IcosahedronBufferGeometry(radius, 2);
     let wireframe = new THREE.WireframeGeometry(geometry);
     let material = new THREE.LineBasicMaterial({ color: 0x000000 });
-    let lines = new THREE.LineSegments(wireframe, material);
-    scene.add(lines);
+    dataRepresentation = new THREE.LineSegments(wireframe, material);
+    scene.add(dataRepresentation);
+    sampleFromData = () => sampleFromSphereVolume(5);
 }
 
-function randomFromSphere(radius) {
+function sampleFromSphereVolume(radius) {
     let u = Math.random();
     let v = Math.random();
     let theta = 2 * Math.PI * u;
@@ -131,7 +175,8 @@ function gaussian(x, sigma) {
     return Math.exp(-(x * x) / (sigma * sigma));
 }
 
-function iterate(targetPosition, iteration) {
+function iterate() {
+    let targetPosition = sampleFromData();
     let range = params.initialRange * neuronsCount * Math.exp(-params.rangeDecay * iteration);
     let force = params.initialForce * Math.exp(-params.forceDecay * iteration);
 
@@ -146,6 +191,10 @@ function iterate(targetPosition, iteration) {
         position.addScaledVector(difference, scale);
         setNeuronPosition(i, position);
     }
+
+    iteration++;
+
+    neuronsBufferGeometry.attributes.position.needsUpdate = true;
 }
 
 function getNeuronPosition(index) {
