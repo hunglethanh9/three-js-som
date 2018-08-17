@@ -6,11 +6,11 @@ const dat = require('dat.gui');
 guiParams = {
     networkParams: {
         neuronsSpread: 1,
-        neuronsCount: 1000,
-        initialRange: 0.5,
-        initialForce: 0.5,
-        rangeDecay: 0.001,
-        forceDecay: 0.0006,
+        neuronsCount: 200,
+        initialRange: 0.3,
+        initialForce: 0.3,
+        rangeDecay: 0.0007,
+        forceDecay: 0.0005,
     },
     iteration: 0,
     map: '1D',
@@ -50,7 +50,7 @@ function initThree() {
 
     let gui = new dat.GUI({ width: 300 });
 
-    gui.add(guiParams, 'info').name('What is going on?');
+    gui.add(guiParams, 'info').name('<b>What is going on?</b>');
 
     gui.add(guiParams, 'dataset', ['3D sphere volume']).name('Dataset (map from...)');
     gui.add(guiParams, 'map', ['1D']).name('Network (map to...)');
@@ -58,7 +58,7 @@ function initThree() {
     let paramsFolder = gui.addFolder('Network parameters');
     paramsFolder
         .add(guiParams.networkParams, 'neuronsCount', 10, 10000)
-        .name('neuron count <a href="" title="For a multidimensional network, this will be clamped down to fit a regular grid">?</a>');
+        .name('neuron count <a href="#" title="For a multidimensional network, this will be clamped down to fit a regular grid">?</a>');
     paramsFolder
         .add(guiParams.networkParams, 'initialRange', 0, 1)
         .name('<b>h</b> initial range');
