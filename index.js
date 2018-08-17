@@ -10,14 +10,14 @@ params = {
     initialForce: 0.5,
     rangeDecay: 0.001,
     forceDecay: 0.0006,
+    restart: () => restartScene(),
 }
 
 let neuronsCount, iteration = 0;
 
 initThree();
-initNeurons();
 initTarget = (size) => initSphere(size / 2.0);
-initTarget(10);
+initScene();
 animate();
 
 function initThree() {
@@ -38,16 +38,34 @@ function initThree() {
     document.body.appendChild(renderer.domElement);
 
     controls = new OrbitControls(camera, renderer.domElement);
+    controls.enablePan = false;
+
+    let gui = new dat.GUI();
+    gui.add(params, 'restart');
+}
+
+function initScene() {
+    initNeurons();
+    initTarget(10);
+}
+
+function clearScene() {
+    scene.remove(neuronPoints);
+    scene.remove(neuronLines);
+    neuronsBufferGeometry.dispose();
+    scene.remove(dataRepresentation);
+}
+
+function restartScene() {
+    clearScene();
+    initScene();
 }
 
 function animate() {
     requestAnimationFrame(animate);
 
     if (params.isPlaying) {
-        let pickedTarget = randomFromSphere(5);
-
-        iterate(pickedTarget, iteration);
-        iteration++;
+        iterate();
         neuronsBufferGeometry.attributes.position.needsUpdate = true;
     }
 
@@ -59,7 +77,7 @@ function initNeurons() {
 
     let points = [];
     for (let i = 0; i < neuronsCount; i++) {
-        let point = randomFromSphere(params.neuronsInitialRadius);
+        let point = sampleFromSphereVolume(params.neuronsInitialRadius);
         points.push(point.x, point.y, point.z);
     }
 
@@ -71,11 +89,11 @@ function initNeurons() {
     neuronPositions = neuronsBufferGeometry.attributes.position.array;
 
     let neuronsMaterial = new THREE.PointsMaterial({ size: .1 });
-    let neuronPoints = new THREE.Points(neuronsBufferGeometry, neuronsMaterial);
+    neuronPoints = new THREE.Points(neuronsBufferGeometry, neuronsMaterial);
     scene.add(neuronPoints);
 
     let neuronLinesMaterial = new THREE.LineBasicMaterial()
-    let neuronLines = new THREE.Line(neuronsBufferGeometry, neuronLinesMaterial);
+    neuronLines = new THREE.Line(neuronsBufferGeometry, neuronLinesMaterial);
     scene.add(neuronLines);
 }
 
@@ -90,11 +108,12 @@ function initSphere(radius) {
     let geometry = new THREE.IcosahedronBufferGeometry(radius, 2);
     let wireframe = new THREE.WireframeGeometry(geometry);
     let material = new THREE.LineBasicMaterial({ color: 0x000000 });
-    let lines = new THREE.LineSegments(wireframe, material);
-    scene.add(lines);
+    dataRepresentation = new THREE.LineSegments(wireframe, material);
+    scene.add(dataRepresentation);
+    sampleFromData = () => sampleFromSphereVolume(5);
 }
 
-function randomFromSphere(radius) {
+function sampleFromSphereVolume(radius) {
     let u = Math.random();
     let v = Math.random();
     let theta = 2 * Math.PI * u;
@@ -131,7 +150,8 @@ function gaussian(x, sigma) {
     return Math.exp(-(x * x) / (sigma * sigma));
 }
 
-function iterate(targetPosition, iteration) {
+function iterate() {
+    let targetPosition = sampleFromData();
     let range = params.initialRange * neuronsCount * Math.exp(-params.rangeDecay * iteration);
     let force = params.initialForce * Math.exp(-params.forceDecay * iteration);
 
@@ -146,6 +166,8 @@ function iterate(targetPosition, iteration) {
         position.addScaledVector(difference, scale);
         setNeuronPosition(i, position);
     }
+
+    iteration++;
 }
 
 function getNeuronPosition(index) {
