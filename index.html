@@ -11,6 +11,21 @@
 <body>
     <script src="bundle.js"></script>
     <a href="https://github.com/j4nw/three-js-som"><img style="position: absolute; top: 0; left: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_left_white_ffffff.png"></a>
+
+    <div id="modal" onclick="this.style.display='none'">
+        <div id="info">
+            A self-organizing map is a fairly simple type of neural network, used mostly as a dimensionality reduction algorithm for
+            data visualization purposes.
+            <br/><br/>You see a network of neurons (white) trying to fit a blob of data (black) by picking a random datapoint,
+            then dragging the closest neuron towards it. The dragging strength and the influence on neighboring neurons decay
+            exponentially with each iteration.
+            <br/><br/>You could do roughly the same thing with a string of numbered beads and a printout of a scatterplot
+            (for a 2D to 1D reduction). You could then represent the 2D data (x, y coordinates of a point on the scatterplot)
+            on a 1D number line (number on the bead closest to the particular point), and have a decent mapping for new datapoints
+            as well.
+            <br/><br/>Check out the <a href=https://en.wikipedia.org/wiki/Self-organizing_map>Wikipedia article</a>.
+        </div>
+    </div>
 </body>
 
 </html>
