@@ -11,9 +11,13 @@ guiParams = {
         rangeDecay: 0.001,
         forceDecay: 0.0006,
     },
+    iteration: 0,
+    map: '1D',
+    dataset: '3D sphere volume',
     isPlaying: true,
     restart: () => restartScene(),
     iterate: () => iterate(),
+    info: () => document.getElementById('modal').style.display = 'block',
 }
 
 let neuronsCount, iteration = 0;
@@ -45,10 +49,15 @@ function initThree() {
 
     let gui = new dat.GUI({ width: 300 });
 
+    gui.add(guiParams, 'info').name('What is going on?');
+
+    gui.add(guiParams, 'dataset', ['3D sphere volume']).name('Dataset (map from...)');
+    gui.add(guiParams, 'map', ['1D']).name('Network (map to...)');
+
     let paramsFolder = gui.addFolder('Network parameters');
     paramsFolder
         .add(guiParams.networkParams, 'neuronsCount', 10, 10000)
-        .name('neuron count <a style="color: #fff" href="" title="For a multidimensional network, this will be clamped down to fit a regular grid">?</a>');
+        .name('neuron count <a href="" title="For a multidimensional network, this will be clamped down to fit a regular grid">?</a>');
     paramsFolder
         .add(guiParams.networkParams, 'initialRange', 0, 1)
         .name('<b>h</b> initial range');
@@ -60,16 +69,16 @@ function initThree() {
         .name('<b>&sigma;</b> initial force');
     paramsFolder
         .add(guiParams.networkParams, 'forceDecay', 0, .005)
-        .name('<b>&lambda;<sub>&sigma;</sub></b> force decay');;
+        .name('<b>&lambda;<sub>&sigma;</sub></b> force decay');
 
     gui.add(guiParams, 'isPlaying').name('Autoplay');
-    gui.add(guiParams, 'iterate').name('Iterate once');
+    gui.add(guiParams, 'iterate').name('Step forward');
+    gui.add(guiParams, 'iteration').name('Iteration').listen();
     gui.add(guiParams, 'restart').name('<b>RESTART</b>');
 }
 
 function initScene() {
     params = Object.assign({}, guiParams.networkParams);
-    console.table(params);
     initNeurons();
     initTarget(10);
 }
@@ -85,6 +94,7 @@ function restartScene() {
     clearScene();
     initScene();
     iteration = 0;
+    guiParams.iteration = iteration;
 }
 
 function animate() {
@@ -193,6 +203,7 @@ function iterate() {
     }
 
     iteration++;
+    guiParams.iteration = iteration;
 
     neuronsBufferGeometry.attributes.position.needsUpdate = true;
 }
