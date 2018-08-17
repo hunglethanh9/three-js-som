@@ -2,15 +2,18 @@ const THREE = require('three')
 const OrbitControls = require('three-orbit-controls')(THREE)
 const dat = require('dat.gui');
 
-params = {
-    neuronsInitialRadius: 1,
-    neuronsAmountSide: 1000,
+guiParams = {
+    networkParams: {
+        neuronsSpread: 1,
+        neuronsCount: 1000,
+        initialRange: 0.5,
+        initialForce: 0.5,
+        rangeDecay: 0.001,
+        forceDecay: 0.0006,
+    },
     isPlaying: true,
-    initialRange: 0.5,
-    initialForce: 0.5,
-    rangeDecay: 0.001,
-    forceDecay: 0.0006,
     restart: () => restartScene(),
+    iterate: () => iterate(),
 }
 
 let neuronsCount, iteration = 0;
@@ -40,11 +43,33 @@ function initThree() {
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enablePan = false;
 
-    let gui = new dat.GUI();
-    gui.add(params, 'restart');
+    let gui = new dat.GUI({ width: 300 });
+
+    let paramsFolder = gui.addFolder('Network parameters');
+    paramsFolder
+        .add(guiParams.networkParams, 'neuronsCount', 10, 10000)
+        .name('neuron count <a style="color: #fff" href="" title="For a multidimensional network, this will be clamped down to fit a regular grid">?</a>');
+    paramsFolder
+        .add(guiParams.networkParams, 'initialRange', 0, 1)
+        .name('<b>h</b> initial range');
+    paramsFolder
+        .add(guiParams.networkParams, 'rangeDecay', 0, .005)
+        .name('<b>&lambda;<sub>h</sub></b> range decay');
+    paramsFolder
+        .add(guiParams.networkParams, 'initialForce', 0, 1)
+        .name('<b>&sigma;</b> initial force');
+    paramsFolder
+        .add(guiParams.networkParams, 'forceDecay', 0, .005)
+        .name('<b>&lambda;<sub>&sigma;</sub></b> force decay');;
+
+    gui.add(guiParams, 'isPlaying').name('Autoplay');
+    gui.add(guiParams, 'iterate').name('Iterate once');
+    gui.add(guiParams, 'restart').name('<b>RESTART</b>');
 }
 
 function initScene() {
+    params = Object.assign({}, guiParams.networkParams);
+    console.table(params);
     initNeurons();
     initTarget(10);
 }
@@ -59,25 +84,25 @@ function clearScene() {
 function restartScene() {
     clearScene();
     initScene();
+    iteration = 0;
 }
 
 function animate() {
     requestAnimationFrame(animate);
 
-    if (params.isPlaying) {
+    if (guiParams.isPlaying) {
         iterate();
-        neuronsBufferGeometry.attributes.position.needsUpdate = true;
     }
 
     renderer.render(scene, camera);
 }
 
 function initNeurons() {
-    neuronsCount = params.neuronsAmountSide;
+    neuronsCount = params.neuronsCount;
 
     let points = [];
     for (let i = 0; i < neuronsCount; i++) {
-        let point = sampleFromSphereVolume(params.neuronsInitialRadius);
+        let point = sampleFromSphereVolume(params.neuronsSpread);
         points.push(point.x, point.y, point.z);
     }
 
@@ -168,6 +193,8 @@ function iterate() {
     }
 
     iteration++;
+
+    neuronsBufferGeometry.attributes.position.needsUpdate = true;
 }
 
 function getNeuronPosition(index) {
