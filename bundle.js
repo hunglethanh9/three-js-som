@@ -6,14 +6,14 @@ const dat = require('dat.gui');
 guiParams = {
     networkParams: {
         neuronsSpread: 1,
-        neuronsCount: 200,
+        neuronsCount: 400,
         initialRange: 0.3,
         initialForce: 0.3,
         rangeDecay: 0.0007,
         forceDecay: 0.0005,
     },
     iteration: 0,
-    map: '1D',
+    map: '2D',
     dataset: '3D sphere volume',
     isPlaying: true,
     restart: () => restartScene(),
@@ -21,7 +21,7 @@ guiParams = {
     info: () => document.getElementById('modal').style.display = 'block',
 }
 
-let neuronsCount, iteration = 0;
+let neuronsCount, neuronsCountSide, iteration = 0;
 
 initThree();
 initTarget = (size) => initSphere(size / 2.0);
@@ -53,7 +53,7 @@ function initThree() {
     gui.add(guiParams, 'info').name('<b>What is going on?</b>');
 
     gui.add(guiParams, 'dataset', ['3D sphere volume']).name('Dataset (map from...)');
-    gui.add(guiParams, 'map', ['1D']).name('Network (map to...)');
+    gui.add(guiParams, 'map', ['1D', '2D', '3D']).name('Network (map to...)');
 
     let paramsFolder = gui.addFolder('Network parameters');
     paramsFolder
@@ -79,6 +79,7 @@ function initThree() {
 }
 
 function initScene() {
+    console.dir(guiParams);
     params = Object.assign({}, guiParams.networkParams);
     initNeurons();
     initTarget(10);
@@ -109,7 +110,9 @@ function animate() {
 }
 
 function initNeurons() {
-    neuronsCount = params.neuronsCount;
+    networkDimensions = Number(guiParams.map.charAt(0));
+    neuronsCountSide = Math.floor(Math.pow(params.neuronsCount, 1 / networkDimensions));
+    neuronsCount = Math.pow(neuronsCountSide, networkDimensions);
 
     let points = [];
     for (let i = 0; i < neuronsCount; i++) {
@@ -121,25 +124,66 @@ function initNeurons() {
     neuronsBufferGeometry.dynamic = true;
     let vertices = new Float32Array(points);
     neuronsBufferGeometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
-    neuronsBufferGeometry.computeBoundingSphere();
     neuronPositions = neuronsBufferGeometry.attributes.position.array;
 
     let neuronsMaterial = new THREE.PointsMaterial({ size: .1 });
     neuronPoints = new THREE.Points(neuronsBufferGeometry, neuronsMaterial);
     scene.add(neuronPoints);
 
-    let neuronLinesMaterial = new THREE.LineBasicMaterial()
-    neuronLines = new THREE.Line(neuronsBufferGeometry, neuronLinesMaterial);
-    scene.add(neuronLines);
+    let neuronLinesMaterial = new THREE.LineBasicMaterial();
+
+    switch (guiParams.map) {
+        case '1D':
+            neighborhoodDistance = (a, b) => neighborhoodDistance1D(a, b);
+            neuronLines = new THREE.Line(neuronsBufferGeometry, neuronLinesMaterial);
+            scene.add(neuronLines);
+            break;
+        case '2D':
+            neighborhoodDistance = (a, b) => neighborhoodDistance2D(a, b);
+            let indices2D = [];
+            for (let i = 0; i < neuronsCount; i++) {
+                var p = mapTo2D(i);
+                if (p.x + 1 < neuronsCountSide) {
+                    indices2D.push(i);
+                    indices2D.push(mapFrom2D(p.x + 1, p.y));
+                }
+                if (p.y + 1 < neuronsCountSide) {
+                    indices2D.push(i);
+                    indices2D.push(mapFrom2D(p.x, p.y + 1));
+                }
+            }
+            neuronsBufferGeometry.setIndex(indices2D);
+            neuronLines = new THREE.LineSegments(neuronsBufferGeometry, neuronLinesMaterial);
+            scene.add(neuronLines);
+            break;
+        case '3D':
+            neighborhoodDistance = (a, b) => neighborhoodDistance3D(a, b);
+            let indices3D = [];
+            for (let i = 0; i < neuronsCount; i++) {
+                var p = mapTo3D(i);
+                if (p.x + 1 < neuronsCountSide) {
+                    indices3D.push(i);
+                    indices3D.push(mapFrom3D(p.x + 1, p.y, p.z));
+                }
+                if (p.y + 1 < neuronsCountSide) {
+                    indices3D.push(i);
+                    indices3D.push(mapFrom3D(p.x, p.y + 1, p.z));
+                }
+                if (p.z + 1 < neuronsCountSide) {
+                    indices3D.push(i);
+                    indices3D.push(mapFrom3D(p.x, p.y, p.z + 1));
+                }
+            }
+            neuronsBufferGeometry.setIndex(indices3D);
+            neuronLines = new THREE.LineSegments(neuronsBufferGeometry, neuronLinesMaterial);
+            scene.add(neuronLines);
+            break;
+    }
 }
 
-window.addEventListener('resize', onWindowResize);
+let nn = n * n;
+let nnn = n * n * n;
 
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
 function initSphere(radius) {
     let geometry = new THREE.IcosahedronBufferGeometry(radius, 2);
     let wireframe = new THREE.WireframeGeometry(geometry);
@@ -180,7 +224,38 @@ function neighborhoodDistance1D(index1, index2) {
     return Math.abs(index1 - index2);
 }
 
-neighborhoodDistance = (a, b) => neighborhoodDistance1D(a, b);
+function mapTo2D(index) {
+    let x = index % neuronsCountSide;
+    let y = Math.floor(index / neuronsCountSide);
+    return { x: x, y: y };
+}
+
+function mapFrom2D(x, y) {
+    return x + y * neuronsCountSide;
+}
+
+function neighborhoodDistance2D(index1, index2) {
+    let p1 = mapTo2D(index1);
+    let p2 = mapTo2D(index2);
+    return new THREE.Vector2(p1.x - p2.x, p1.y - p2.y).length();
+}
+
+function mapTo3D(index) {
+    let x = index % neuronsCountSide;
+    let y = Math.floor(index / neuronsCountSide) % neuronsCountSide;
+    let z = Math.floor(index / (neuronsCountSide * neuronsCountSide));
+    return { x: x, y: y, z: z };
+}
+
+function mapFrom3D(x, y, z) {
+    return x + y * neuronsCountSide + z * neuronsCountSide * neuronsCountSide;
+}
+
+function neighborhoodDistance3D(index1, index2) {
+    let p1 = mapTo3D(index1);
+    let p2 = mapTo3D(index2);
+    return new THREE.Vector3(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z).length();
+}
 
 function gaussian(x, sigma) {
     return Math.exp(-(x * x) / (sigma * sigma));
@@ -188,7 +263,7 @@ function gaussian(x, sigma) {
 
 function iterate() {
     let targetPosition = sampleFromData();
-    let range = params.initialRange * neuronsCount * Math.exp(-params.rangeDecay * iteration);
+    let range = params.initialRange * neuronsCountSide * networkDimensions * Math.exp(-params.rangeDecay * iteration);
     let force = params.initialForce * Math.exp(-params.forceDecay * iteration);
 
     let bestIndex, bestPosition;
@@ -196,7 +271,7 @@ function iterate() {
 
     for (let i = 0; i < neuronsCount; i++) {
         let position = getNeuronPosition(i);
-        let indexDistance = neighborhoodDistance1D(i, bestIndex);
+        let indexDistance = neighborhoodDistance(i, bestIndex);
         let scale = force * gaussian(indexDistance, range);
         let difference = new THREE.Vector3().subVectors(targetPosition, position);
         position.addScaledVector(difference, scale);
@@ -221,6 +296,14 @@ function setNeuronPosition(index, position) {
     neuronPositions[3 * index + 0] = position.x;
     neuronPositions[3 * index + 1] = position.y;
     neuronPositions[3 * index + 2] = position.z;
+}
+
+window.addEventListener('resize', onWindowResize);
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 },{"dat.gui":2,"three":4,"three-orbit-controls":3}],2:[function(require,module,exports){
 /**
