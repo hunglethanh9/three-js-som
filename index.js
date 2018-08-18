@@ -6,10 +6,10 @@ guiParams = {
     networkParams: {
         neuronsSpread: 1,
         neuronsCount: 400,
-        initialRange: 0.3,
+        initialRange: 0.4,
         initialForce: 0.3,
         rangeDecay: 0.0007,
-        forceDecay: 0.0005,
+        forceDecay: 0.0007,
     },
     iteration: 0,
     map: '2D',
@@ -18,6 +18,7 @@ guiParams = {
     restart: () => restartScene(),
     iterate: () => iterate(),
     info: () => document.getElementById('modal').style.display = 'block',
+    showLines: true,
 }
 
 let neuronsCount, neuronsCountSide, iteration = 0;
@@ -29,7 +30,7 @@ animate();
 
 function initThree() {
     scene = new THREE.Scene();
-    let backgroundColor = new THREE.Color(0x888888);
+    let backgroundColor = new THREE.Color(0x000000);
     scene.fog = new THREE.FogExp2(backgroundColor, 0.06);
     scene.background = backgroundColor;
 
@@ -71,6 +72,11 @@ function initThree() {
         .add(guiParams.networkParams, 'forceDecay', 0, .005)
         .name('<b>&lambda;<sub>&sigma;</sub></b> force decay');
 
+    // let showLines = gui.add(guiParams, 'isPlaying').name('Show lines').listen();
+    // showLines.onChange((value) => {
+    //     neuronLines.visible = value;
+    // });
+
     gui.add(guiParams, 'isPlaying').name('Autoplay');
     gui.add(guiParams, 'iterate').name('Step forward');
     gui.add(guiParams, 'iteration').name('Iteration').listen();
@@ -78,7 +84,6 @@ function initThree() {
 }
 
 function initScene() {
-    console.dir(guiParams);
     params = Object.assign({}, guiParams.networkParams);
     initNeurons();
     initTarget(10);
@@ -121,23 +126,27 @@ function initNeurons() {
 
     neuronsBufferGeometry = new THREE.BufferGeometry();
     neuronsBufferGeometry.dynamic = true;
-    let vertices = new Float32Array(points);
-    neuronsBufferGeometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    neuronsBufferGeometry.addAttribute('position', new THREE.Float32BufferAttribute(points, 3));
     neuronPositions = neuronsBufferGeometry.attributes.position.array;
-
-    let neuronsMaterial = new THREE.PointsMaterial({ size: .1 });
-    neuronPoints = new THREE.Points(neuronsBufferGeometry, neuronsMaterial);
-    scene.add(neuronPoints);
 
     let neuronLinesMaterial = new THREE.LineBasicMaterial();
 
-    switch (guiParams.map) {
-        case '1D':
+    let colors = [];
+
+    switch (networkDimensions) {
+        case 1:
             neighborhoodDistance = (a, b) => neighborhoodDistance1D(a, b);
+            for (let i = 0; i < neuronsCount; i++) {
+                let r = i / (neuronsCount - 1);
+                let g = 1 - r;
+                let b = 1 - Math.abs(r - g);
+                colors.push(r);
+                colors.push(g);
+                colors.push(b);
+            }
             neuronLines = new THREE.Line(neuronsBufferGeometry, neuronLinesMaterial);
-            scene.add(neuronLines);
             break;
-        case '2D':
+        case 2:
             neighborhoodDistance = (a, b) => neighborhoodDistance2D(a, b);
             let indices2D = [];
             for (let i = 0; i < neuronsCount; i++) {
@@ -150,12 +159,17 @@ function initNeurons() {
                     indices2D.push(i);
                     indices2D.push(mapFrom2D(p.x, p.y + 1));
                 }
+                let r = p.x / (neuronsCountSide - 1);
+                let g = p.y / (neuronsCountSide - 1);
+                let b = 1 - Math.abs(r - g);
+                colors.push(r);
+                colors.push(g);
+                colors.push(b);
             }
             neuronsBufferGeometry.setIndex(indices2D);
             neuronLines = new THREE.LineSegments(neuronsBufferGeometry, neuronLinesMaterial);
-            scene.add(neuronLines);
             break;
-        case '3D':
+        case 3:
             neighborhoodDistance = (a, b) => neighborhoodDistance3D(a, b);
             let indices3D = [];
             for (let i = 0; i < neuronsCount; i++) {
@@ -172,21 +186,30 @@ function initNeurons() {
                     indices3D.push(i);
                     indices3D.push(mapFrom3D(p.x, p.y, p.z + 1));
                 }
+
+                let r = p.x / (neuronsCountSide - 1);
+                let g = p.y / (neuronsCountSide - 1);
+                let b = p.z / (neuronsCountSide - 1);
+                colors.push(r);
+                colors.push(g);
+                colors.push(b);
             }
             neuronsBufferGeometry.setIndex(indices3D);
             neuronLines = new THREE.LineSegments(neuronsBufferGeometry, neuronLinesMaterial);
-            scene.add(neuronLines);
             break;
     }
+    neuronsBufferGeometry.addAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    let neuronsMaterial = new THREE.PointsMaterial({ size: .2, vertexColors: THREE.VertexColors });
+    neuronPoints = new THREE.Points(neuronsBufferGeometry, neuronsMaterial);
+
+    scene.add(neuronPoints);
+    scene.add(neuronLines);
 }
 
-let nn = n * n;
-let nnn = n * n * n;
-
 function initSphere(radius) {
-    let geometry = new THREE.IcosahedronBufferGeometry(radius, 2);
+    let geometry = new THREE.IcosahedronBufferGeometry(radius, 1);
     let wireframe = new THREE.WireframeGeometry(geometry);
-    let material = new THREE.LineBasicMaterial({ color: 0x000000 });
+    let material = new THREE.LineBasicMaterial({ color: 0xFFFFFF });
     dataRepresentation = new THREE.LineSegments(wireframe, material);
     scene.add(dataRepresentation);
     sampleFromData = () => sampleFromSphereVolume(5);
