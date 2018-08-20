@@ -11,9 +11,10 @@ sceneSettings = {
 }
 
 datasets = {
-    sphereVolume: '3D sphere volume',
-    sphereSurface: '3D sphere surface',
-    twoSphereVolume: '3D two spheres volume',
+    sphere: '3D sphere',
+    sphereSurface: '3D sphere (surface)',
+    twoSpheres: '3D two spheres',
+    cylinder: '3D flat cylinder',
 }
 
 guiModel = {
@@ -28,7 +29,7 @@ guiModel = {
     },
     iteration: 0,
     map: '2D grid',
-    dataset: datasets.sphereVolume,
+    dataset: datasets.sphere,
     isPlaying: true,
     restart: () => restartScene(),
     iterate: () => iterate(),
@@ -47,7 +48,7 @@ function initScene() {
 
     let aspectRatio = window.innerWidth / window.innerHeight;
     camera = new THREE.PerspectiveCamera(sceneSettings.fov, aspectRatio);
-    let cameraPosition = new THREE.Vector3(1, 1, 1).normalize().multiplyScalar(sceneSettings.cameraDistance);
+    let cameraPosition = new THREE.Vector3(0.3, 0.1, 1).normalize().multiplyScalar(sceneSettings.cameraDistance);
     camera.position.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
     camera.lookAt(new THREE.Vector3());
 
@@ -102,14 +103,17 @@ function initNetwork() {
 
 function initData() {
     switch (guiModel.dataset) {
+        case datasets.sphere:
+            initDatasetSphere();
+            break;
         case datasets.sphereSurface:
-            initSphereSurface();
+            initDatasetSphereSurface();
             break;
-        case datasets.sphereVolume:
-            initSphereVolume();
+        case datasets.twoSpheres:
+            initDatasetTwoSpheres();
             break;
-        case datasets.twoSphereVolume:
-            initTwoSphereVolume();
+        case datasets.cylinder:
+            initDatasetCylinder();
             break;
     }
 }
@@ -222,21 +226,21 @@ function sphereRepresentation(radius) {
     return new THREE.LineSegments(wireframe, material);
 }
 
-function initSphereVolume() {
+function initDatasetSphere() {
     let radius = sceneSettings.scale;
     dataRepresentation = sphereRepresentation(radius);
     scene.add(dataRepresentation);
     sampleFromData = () => sampleFromSphereVolume(radius);
 }
 
-function initSphereSurface() {
+function initDatasetSphereSurface() {
     let radius = sceneSettings.scale;
     dataRepresentation = sphereRepresentation(radius);
     scene.add(dataRepresentation);
     sampleFromData = () => sampleFromSphereSurface(radius);
 }
 
-function initTwoSphereVolume() {
+function initDatasetTwoSpheres() {
     let radius = sceneSettings.scale / 2;
     let distance = sceneSettings.scale * 1.5;
     let sphere1 = sphereRepresentation(radius);
@@ -250,18 +254,35 @@ function initTwoSphereVolume() {
     sampleFromData = () => sampleFromTwoSphereVolume(radius, distance);
 }
 
-function sampleFromSphereVolume(radius, center) {
-    center = center || new THREE.Vector3();
+function initDatasetCylinder() {
+    let radius = sceneSettings.scale;
+    let height = sceneSettings.scale / 5;
+    let geometry = new THREE.CylinderBufferGeometry(radius, radius, height, 12);
+    let wireframe = new THREE.WireframeGeometry(geometry);
+    let material = new THREE.LineBasicMaterial();
+    dataRepresentation = new THREE.LineSegments(wireframe, material);
+    scene.add(dataRepresentation);
+    sampleFromData = () => {
+        let theta = Math.random() * 2 * Math.PI;
+        let randomRadius = radius * Math.sqrt(Math.random());
+        let x = randomRadius * Math.cos(theta);
+        let y = (0.5 - Math.random()) * height;
+        let z = randomRadius * Math.sin(theta);
+        return new THREE.Vector3(x, y, z);
+    }
+}
+
+function sampleFromSphereVolume(radius) {
     let u = Math.random();
     let v = Math.random();
     let theta = 2 * Math.PI * u;
     let phi = Math.acos(2 * v - 1);
     let sinPhi = Math.sin(phi);
-    let adjustedRandomRadius = radius * Math.cbrt(Math.random());
-    let x = adjustedRandomRadius * Math.cos(theta) * sinPhi;
-    let y = adjustedRandomRadius * Math.sin(theta) * sinPhi
-    let z = adjustedRandomRadius * Math.cos(phi);
-    return new THREE.Vector3(center.x + x, center.y + y, center.z + z);
+    let randomRadius = radius * Math.cbrt(Math.random());
+    let x = randomRadius * Math.cos(theta) * sinPhi;
+    let y = randomRadius * Math.sin(theta) * sinPhi
+    let z = randomRadius * Math.cos(phi);
+    return new THREE.Vector3(x, y, z);
 }
 
 function sampleFromTwoSphereVolume(radius, distance) {
@@ -269,8 +290,9 @@ function sampleFromTwoSphereVolume(radius, distance) {
     if (Math.random() > .5) {
         centerX = -centerX;
     }
-    let center = new THREE.Vector3(centerX, 0, 0);
-    return sampleFromSphereVolume(radius, center);
+    let point = sampleFromSphereVolume(radius);
+    point.x += centerX;
+    return point;
 }
 
 function sampleFromSphereSurface(radius) {
