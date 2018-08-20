@@ -12,8 +12,8 @@ sceneSettings = {
 
 datasets = {
     sphereVolume: '3D sphere volume',
-    doubleSphereVolume: '3D double sphere volume',
     sphereSurface: '3D sphere surface',
+    twoSphereVolume: '3D two spheres volume',
 }
 
 guiModel = {
@@ -108,8 +108,8 @@ function initData() {
         case datasets.sphereVolume:
             initSphereVolume();
             break;
-        case datasets.doubleSphereVolume:
-            initSphereVolume();
+        case datasets.twoSphereVolume:
+            initTwoSphereVolume();
             break;
     }
 }
@@ -215,25 +215,39 @@ function initNeurons() {
     scene.add(neuronLines);
 }
 
-function initSphereRepresentation(radius, center) {
-    center = center || new THREE.Vector3();
+function sphereRepresentation(radius) {
     let geometry = new THREE.IcosahedronBufferGeometry(radius, 1);
     let wireframe = new THREE.WireframeGeometry(geometry);
     let material = new THREE.LineBasicMaterial();
-    dataRepresentation = new THREE.LineSegments(wireframe, material);
-    scene.add(dataRepresentation);
+    return new THREE.LineSegments(wireframe, material);
 }
 
 function initSphereVolume() {
     let radius = sceneSettings.scale;
-    initSphereRepresentation(radius);
+    dataRepresentation = sphereRepresentation(radius);
+    scene.add(dataRepresentation);
     sampleFromData = () => sampleFromSphereVolume(radius);
 }
 
 function initSphereSurface() {
     let radius = sceneSettings.scale;
-    initSphereRepresentation(radius);
+    dataRepresentation = sphereRepresentation(radius);
+    scene.add(dataRepresentation);
     sampleFromData = () => sampleFromSphereSurface(radius);
+}
+
+function initTwoSphereVolume() {
+    let radius = sceneSettings.scale / 2;
+    let distance = sceneSettings.scale * 1.5;
+    let sphere1 = sphereRepresentation(radius);
+    sphere1.position.set(distance / 2, 0, 0);
+    let sphere2 = sphereRepresentation(radius);
+    sphere2.position.set(-distance / 2, 0, 0);
+    dataRepresentation = new THREE.Object3D();
+    dataRepresentation.add(sphere1);
+    dataRepresentation.add(sphere2);
+    scene.add(dataRepresentation);
+    sampleFromData = () => sampleFromTwoSphereVolume(radius, distance);
 }
 
 function sampleFromSphereVolume(radius, center) {
@@ -248,6 +262,15 @@ function sampleFromSphereVolume(radius, center) {
     let y = adjustedRandomRadius * Math.sin(theta) * sinPhi
     let z = adjustedRandomRadius * Math.cos(phi);
     return new THREE.Vector3(center.x + x, center.y + y, center.z + z);
+}
+
+function sampleFromTwoSphereVolume(radius, distance) {
+    let centerX = distance / 2;
+    if (Math.random() > .5) {
+        centerX = -centerX;
+    }
+    let center = new THREE.Vector3(centerX, 0, 0);
+    return sampleFromSphereVolume(radius, center);
 }
 
 function sampleFromSphereSurface(radius) {
