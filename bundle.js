@@ -3,43 +3,54 @@ const THREE = require('three')
 const OrbitControls = require('three-orbit-controls')(THREE)
 const dat = require('dat.gui');
 
-guiParams = {
-    networkParams: {
+sceneSettings = {
+    backgroundColor: new THREE.Color(0x000000),
+    fogStrength: 0.06,
+    fov: 60,
+    scale: 5,
+    cameraDistance: 11,
+}
+
+datasets = {
+    sphere: '3D sphere',
+    sphereSurface: '3D sphere (surface)',
+    twoSpheres: '3D two spheres',
+    cylinder: '3D flat cylinder',
+}
+
+guiModel = {
+    params: {
         neuronsSpread: 1,
-        neuronsCount: 400,
-        initialRange: 0.4,
-        initialForce: 0.3,
-        rangeDecay: 0.0007,
-        forceDecay: 0.0007,
+        neuronsCount: 500,
+        initialRange: 0.5,
+        initialForce: 0.5,
+        rangeDecay: 0.0009,
+        forceDecay: 0.0008,
+        iteration: 0,
     },
     iteration: 0,
-    map: '2D',
-    dataset: '3D sphere volume',
+    map: '2D grid',
+    dataset: datasets.sphere,
     isPlaying: true,
     restart: () => restartScene(),
     iterate: () => iterate(),
     info: () => document.getElementById('modal').style.display = 'block',
-    showLines: true,
 }
 
-let neuronsCount, neuronsCountSide, iteration = 0;
-
-initThree();
-initTarget = (size) => initSphere(size / 2.0);
 initScene();
+initGui();
+initNetwork();
 animate();
 
-function initThree() {
+function initScene() {
     scene = new THREE.Scene();
-    let backgroundColor = new THREE.Color(0x000000);
-    scene.fog = new THREE.FogExp2(backgroundColor, 0.06);
-    scene.background = backgroundColor;
+    scene.fog = new THREE.FogExp2(sceneSettings.backgroundColor, sceneSettings.fogStrength);
+    scene.background = sceneSettings.backgroundColor;
 
-    aspect = window.innerWidth / window.innerHeight;
-    let fov = 60;
-    camera = new THREE.PerspectiveCamera(fov, aspect);
-    let distance = 7;
-    camera.position.set(distance, distance, distance);
+    let aspectRatio = window.innerWidth / window.innerHeight;
+    camera = new THREE.PerspectiveCamera(sceneSettings.fov, aspectRatio);
+    let cameraPosition = new THREE.Vector3(0.3, 0.1, 1).normalize().multiplyScalar(sceneSettings.cameraDistance);
+    camera.position.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
     camera.lookAt(new THREE.Vector3());
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -48,92 +59,95 @@ function initThree() {
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enablePan = false;
+}
 
+function initGui() {
     let gui = new dat.GUI({ width: 300 });
 
-    gui.add(guiParams, 'info').name('<b>What is going on?</b>');
-
-    gui.add(guiParams, 'dataset', ['3D sphere volume']).name('Dataset (map from...)');
-    gui.add(guiParams, 'map', ['1D', '2D', '3D']).name('Network (map to...)');
+    gui.add(guiModel, 'info').name('<b>What is going on?</b>');
+    let datasetNames = [];
+    for (const key of Object.keys(datasets)) {
+        datasetNames.push(datasets[key]);
+    }
+    gui.add(guiModel, 'dataset', datasetNames).name('Dataset (map from...)');
+    gui.add(guiModel, 'map', ['1D line', '2D grid', '3D grid']).name('Network (map to...)');
 
     let paramsFolder = gui.addFolder('Network parameters');
     paramsFolder
-        .add(guiParams.networkParams, 'neuronsCount', 10, 10000)
+        .add(guiModel.params, 'neuronsCount', 10, 10000)
         .name('neuron count <a href="#" title="For a multidimensional network, this will be clamped down to fit a regular grid">?</a>');
     paramsFolder
-        .add(guiParams.networkParams, 'initialRange', 0, 1)
+        .add(guiModel.params, 'initialRange', 0, 1)
         .name('<b>h</b> initial range');
     paramsFolder
-        .add(guiParams.networkParams, 'rangeDecay', 0, .005)
+        .add(guiModel.params, 'rangeDecay', 0, .005)
         .name('<b>&lambda;<sub>h</sub></b> range decay');
     paramsFolder
-        .add(guiParams.networkParams, 'initialForce', 0, 1)
+        .add(guiModel.params, 'initialForce', 0, 1)
         .name('<b>&sigma;</b> initial force');
     paramsFolder
-        .add(guiParams.networkParams, 'forceDecay', 0, .005)
+        .add(guiModel.params, 'forceDecay', 0, .005)
         .name('<b>&lambda;<sub>&sigma;</sub></b> force decay');
 
-    // let showLines = gui.add(guiParams, 'isPlaying').name('Show lines').listen();
-    // showLines.onChange((value) => {
-    //     neuronLines.visible = value;
-    // });
-
-    gui.add(guiParams, 'isPlaying').name('Autoplay');
-    gui.add(guiParams, 'iterate').name('Step forward');
-    gui.add(guiParams, 'iteration').name('Iteration').listen();
-    gui.add(guiParams, 'restart').name('<b>RESTART</b>');
+    gui.add(guiModel, 'isPlaying').name('Autoplay');
+    gui.add(guiModel, 'iterate').name('Step forward');
+    gui.add(guiModel, 'iteration').name('Iteration').listen();
+    gui.add(guiModel, 'restart').name('<b>RESTART</b>');
 }
 
-function initScene() {
-    params = Object.assign({}, guiParams.networkParams);
+function initNetwork() {
+    params = Object.assign({}, guiModel.params);
+    guiModel.iteration = 0;
     initNeurons();
-    initTarget(10);
+    initData();
 }
 
-function clearScene() {
+function initData() {
+    switch (guiModel.dataset) {
+        case datasets.sphere:
+            initDatasetSphere();
+            break;
+        case datasets.sphereSurface:
+            initDatasetSphereSurface();
+            break;
+        case datasets.twoSpheres:
+            initDatasetTwoSpheres();
+            break;
+        case datasets.cylinder:
+            initDatasetCylinder();
+            break;
+    }
+}
+
+function restartScene() {
     scene.remove(neuronPoints);
     scene.remove(neuronLines);
     neuronsBufferGeometry.dispose();
     scene.remove(dataRepresentation);
-}
-
-function restartScene() {
-    clearScene();
-    initScene();
-    iteration = 0;
-    guiParams.iteration = iteration;
+    initNetwork();
 }
 
 function animate() {
     requestAnimationFrame(animate);
-
-    if (guiParams.isPlaying) {
+    if (guiModel.isPlaying) {
         iterate();
     }
-
     renderer.render(scene, camera);
 }
 
 function initNeurons() {
-    networkDimensions = Number(guiParams.map.charAt(0));
+    networkDimensions = Number(guiModel.map.charAt(0));
     neuronsCountSide = Math.floor(Math.pow(params.neuronsCount, 1 / networkDimensions));
     neuronsCount = Math.pow(neuronsCountSide, networkDimensions);
 
-    let points = [];
-    for (let i = 0; i < neuronsCount; i++) {
-        let point = sampleFromSphereVolume(params.neuronsSpread);
-        points.push(point.x, point.y, point.z);
-    }
-
     neuronsBufferGeometry = new THREE.BufferGeometry();
     neuronsBufferGeometry.dynamic = true;
-    neuronsBufferGeometry.addAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    let neuronPositionsAttribute = new THREE.Float32BufferAttribute(new Array(3 * neuronsCount).fill(0), 3);
+    neuronsBufferGeometry.addAttribute('position', neuronPositionsAttribute);
     neuronPositions = neuronsBufferGeometry.attributes.position.array;
 
     let neuronLinesMaterial = new THREE.LineBasicMaterial();
-
     let colors = [];
-
     switch (networkDimensions) {
         case 1:
             neighborhoodDistance = (a, b) => neighborhoodDistance1D(a, b);
@@ -187,7 +201,6 @@ function initNeurons() {
                     indices3D.push(i);
                     indices3D.push(mapFrom3D(p.x, p.y, p.z + 1));
                 }
-
                 let r = p.x / (neuronsCountSide - 1);
                 let g = p.y / (neuronsCountSide - 1);
                 let b = p.z / (neuronsCountSide - 1);
@@ -207,13 +220,57 @@ function initNeurons() {
     scene.add(neuronLines);
 }
 
-function initSphere(radius) {
+function sphereRepresentation(radius) {
     let geometry = new THREE.IcosahedronBufferGeometry(radius, 1);
     let wireframe = new THREE.WireframeGeometry(geometry);
-    let material = new THREE.LineBasicMaterial({ color: 0xFFFFFF });
+    let material = new THREE.LineBasicMaterial();
+    return new THREE.LineSegments(wireframe, material);
+}
+
+function initDatasetSphere() {
+    let radius = sceneSettings.scale;
+    dataRepresentation = sphereRepresentation(radius);
+    scene.add(dataRepresentation);
+    sampleFromData = () => sampleFromSphereVolume(radius);
+}
+
+function initDatasetSphereSurface() {
+    let radius = sceneSettings.scale;
+    dataRepresentation = sphereRepresentation(radius);
+    scene.add(dataRepresentation);
+    sampleFromData = () => sampleFromSphereSurface(radius);
+}
+
+function initDatasetTwoSpheres() {
+    let radius = sceneSettings.scale / 2;
+    let distance = sceneSettings.scale * 1.5;
+    let sphere1 = sphereRepresentation(radius);
+    sphere1.position.set(distance / 2, 0, 0);
+    let sphere2 = sphereRepresentation(radius);
+    sphere2.position.set(-distance / 2, 0, 0);
+    dataRepresentation = new THREE.Object3D();
+    dataRepresentation.add(sphere1);
+    dataRepresentation.add(sphere2);
+    scene.add(dataRepresentation);
+    sampleFromData = () => sampleFromTwoSphereVolume(radius, distance);
+}
+
+function initDatasetCylinder() {
+    let radius = sceneSettings.scale;
+    let height = sceneSettings.scale / 5;
+    let geometry = new THREE.CylinderBufferGeometry(radius, radius, height, 12);
+    let wireframe = new THREE.WireframeGeometry(geometry);
+    let material = new THREE.LineBasicMaterial();
     dataRepresentation = new THREE.LineSegments(wireframe, material);
     scene.add(dataRepresentation);
-    sampleFromData = () => sampleFromSphereVolume(5);
+    sampleFromData = () => {
+        let theta = Math.random() * 2 * Math.PI;
+        let randomRadius = radius * Math.sqrt(Math.random());
+        let x = randomRadius * Math.cos(theta);
+        let y = (0.5 - Math.random()) * height;
+        let z = randomRadius * Math.sin(theta);
+        return new THREE.Vector3(x, y, z);
+    }
 }
 
 function sampleFromSphereVolume(radius) {
@@ -222,10 +279,32 @@ function sampleFromSphereVolume(radius) {
     let theta = 2 * Math.PI * u;
     let phi = Math.acos(2 * v - 1);
     let sinPhi = Math.sin(phi);
-    let adjustedRandomRadius = radius * Math.cbrt(Math.random());
-    let x = adjustedRandomRadius * Math.cos(theta) * sinPhi;
-    let y = adjustedRandomRadius * Math.sin(theta) * sinPhi
-    let z = adjustedRandomRadius * Math.cos(phi);
+    let randomRadius = radius * Math.cbrt(Math.random());
+    let x = randomRadius * Math.cos(theta) * sinPhi;
+    let y = randomRadius * Math.sin(theta) * sinPhi
+    let z = randomRadius * Math.cos(phi);
+    return new THREE.Vector3(x, y, z);
+}
+
+function sampleFromTwoSphereVolume(radius, distance) {
+    let centerX = distance / 2;
+    if (Math.random() > .5) {
+        centerX = -centerX;
+    }
+    let point = sampleFromSphereVolume(radius);
+    point.x += centerX;
+    return point;
+}
+
+function sampleFromSphereSurface(radius) {
+    let u = Math.random();
+    let v = Math.random();
+    let theta = 2 * Math.PI * u;
+    let phi = Math.acos(2 * v - 1);
+    let sinPhi = Math.sin(phi);
+    let x = radius * Math.cos(theta) * sinPhi;
+    let y = radius * Math.sin(theta) * sinPhi
+    let z = radius * Math.cos(phi);
     return new THREE.Vector3(x, y, z);
 }
 
@@ -286,8 +365,8 @@ function gaussian(x, sigma) {
 
 function iterate() {
     let targetPosition = sampleFromData();
-    let range = params.initialRange * neuronsCountSide * networkDimensions * Math.exp(-params.rangeDecay * iteration);
-    let force = params.initialForce * Math.exp(-params.forceDecay * iteration);
+    let range = params.initialRange * neuronsCountSide * Math.sqrt(networkDimensions) * Math.exp(-params.rangeDecay * params.iteration);
+    let force = params.initialForce * Math.exp(-params.forceDecay * params.iteration);
 
     let bestIndex, bestPosition;
     [bestIndex, bestPosition] = findClosestNeuron(targetPosition);
@@ -301,8 +380,8 @@ function iterate() {
         setNeuronPosition(i, position);
     }
 
-    iteration++;
-    guiParams.iteration = iteration;
+    params.iteration++;
+    guiModel.iteration = params.iteration;
 
     neuronsBufferGeometry.attributes.position.needsUpdate = true;
 }
